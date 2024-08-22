@@ -22,6 +22,7 @@ const REMOTE_DEBUG_PORT = process.env.REMOTE_DEBUG_PORT || 35173;
 const FLAGS = process.env.FLAGS || null;
 const EXTRA_FLAGS = process.env.EXTRA_FLAGS || null;
 const HTTPS_REGEX = /^https?:\/\//i //regex for HTTP/S prefix
+const ZOOM_LEVEL = process.env.ZOOM_LEVEL || '1.0';
 
 // Environment variables which can be overriden from the API
 let kioskMode = process.env.KIOSK || '0';
@@ -114,6 +115,7 @@ let launchChromium = async function(url) {
       let balenaFlags = [
         '--window-size=' + WINDOW_SIZE,
         '--window-position=' + WINDOW_POSITION,
+        '--force-device-scale-factor=' + ZOOM_LEVEL,
         '--autoplay-policy=no-user-gesture-required',
         '--noerrdialogs',
         '--disable-session-crashed-bubble',
