@@ -19,3 +19,13 @@ services:
       io.balena.features.kernel-modules: "1"
     volumes:
       - "settings:/data" # Only required if using PERSISTENT flag (see below)
+      - "pulse:/run/pulse"
+  audio:
+    image: bh.cr/balenalabs/audio-rpi # where <arch> is one of rpi, armv7hf, aarch64 or amd64
+    privileged: true
+    labels:
+      io.balena.features.dbus: 1 # Only required for bluetooth support
+    ports:
+      - 4317:4317 # Only required if using PA over TCP socket
+    volumes:
+      - "pulse:/run/pulse"
