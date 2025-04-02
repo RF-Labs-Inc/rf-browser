@@ -1,38 +1,23 @@
 #!/bin/bash
 
-# This script will install chromium to use with the browser block
-# If the device is a Raspberry Pi (any model), it will use the version
-# from the raspios repo (together with mesa and X), because
-# * Since Debian 12, the upstream chromium provided in Debian repos
-#   does not work on armv7 at all
-# * The upstream chromium will not work on devices with < 1GB memory
-#   namely the Pi3A and the PiZero2 even when using aarch64
-# * The Raspberry Pi 5 needs patched versions of mesa and X to work
+# Chromium installation script with H.264 (MP4) codec support
 
 BASE_DIR="/usr/src/build"
 CHROMIUM_PACKAGE="chromium"
-
 MACHINE_NAME="$1"
 
-# FORCE_RPI_REPO=0 never includes the repo
-# FORCE_RPI_REPO=1 always includes the repo
-# If the machine name starts with "raspberry", or if the machine
-# is a balenaFin, include the repo
+# Determine if using Raspberry Pi-specific repo
 if [ "${FORCE_RPI_REPO}" != "0" ] && [ "${FORCE_RPI_REPO}" = "1" -o "${MACHINE_NAME:0:9}" = "raspberry" -o "${MACHINE_NAME}" = "fincm3" ]
 then
     echo "Enabling raspios repository"
-
     cp -a "${BASE_DIR}/rpi/raspi.list" "/etc/apt/sources.list.d/"
     cp -a "${BASE_DIR}/rpi/raspberrypi-archive-stable.gpg" "/etc/apt/trusted.gpg.d/"
-
-    # The RPi-patched chromium package is called chromium-browser
     CHROMIUM_PACKAGE="chromium-browser"
 else
-    # The node library launches /usr/bin/chromium-browser
-    # which is not provided by the upstream package
-    ln -s /usr/bin/chromium /usr/bin/chromium-browser
+    ln -sf /usr/bin/chromium /usr/bin/chromium-browser
 fi
 
+# Install Chromium and dependencies
 install_packages \
     ${CHROMIUM_PACKAGE} \
     chromium-common \
@@ -47,3 +32,35 @@ install_packages \
     xserver-xorg xinit \
     xinput \
     xterm
+
+# Try to install codecs via package manager
+echo "Attempting to install H.264 support via chromium-codecs-ffmpeg-extra"
+
+if apt-cache show chromium-codecs-ffmpeg-extra > /dev/null 2>&1; then
+    apt-get update && apt-get install -y chromium-codecs-ffmpeg-extra
+    echo "✅ Installed chromium-codecs-ffmpeg-extra"
+else
+    echo "⚠️ Package not available. Falling back to injecting libffmpeg.so"
+
+    # Download precompiled libffmpeg.so (latest stable version, compatible with most Chromium builds)
+    CODECS_URL="https://github.com/Slackadays/libffmpeg/releases/latest/download/libffmpeg.so"
+
+    # Determine install path based on Chromium variant
+    if [ -d "/usr/lib/chromium-browser" ]; then
+        INSTALL_PATH="/usr/lib/chromium-browser"
+    elif [ -d "/usr/lib/chromium" ]; then
+        INSTALL_PATH="/usr/lib/chromium"
+    else
+        INSTALL_PATH="/usr/lib/chromium-browser"  # Default fallback
+        mkdir -p "$INSTALL_PATH"
+    fi
+
+    curl -sSL "$CODECS_URL" -o "${INSTALL_PATH}/libffmpeg.so"
+
+    if [ -f "${INSTALL_PATH}/libffmpeg.so" ]; then
+        chmod 644 "${INSTALL_PATH}/libffmpeg.so"
+        echo "✅ Downloaded and installed libffmpeg.so to ${INSTALL_PATH}"
+    else
+        echo "❌ Failed to download libffmpeg.so. MP4 playback may not work."
+    fi
+fi
